@@ -258,7 +258,12 @@ class PartnerGate extends StatelessWidget {
         await FirebaseAuth.instance.signOut();
         return const EmailLoginScreen();
       }
-      return await partnerHomeFor(user.uid);
+      final home = await partnerHomeFor(user.uid);
+      if (home == null) {
+        await FirebaseAuth.instance.signOut();
+        return const EmailLoginScreen();
+      }
+      return home;
     } catch (e, st) {
       AppLog.caught('lib/main.dart:PartnerGate', e, st);
       return const EmailLoginScreen();

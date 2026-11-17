@@ -1,5 +1,8 @@
-import 'package:poolx_partner/vendor/vendor_dashboard_screen.dart';
-import 'package:poolx_partner/vendor/vendor_vehicle_fleet_screen.dart';
+import 'package:poolx_partner/partner/partner_shell.dart';
+import 'package:poolx_partner/vendor/vendor_documents_screen.dart';
+import 'package:poolx_partner/vendor/vendor_payment_option_screen.dart';
+import 'package:poolx_partner/vendor/vendor_profile_submitted_sheet.dart';
+import 'package:poolx_partner/vendor_sign_up_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -110,6 +113,13 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
       }
 
       final nextScreen = await partnerHomeFor(uid);
+
+      if (nextScreen == null) {
+        await _auth.signOut();
+        if (!mounted) return;
+        await showVendorSubmittedSheet(context);
+        return;
+      }
 
       if (!mounted) return;
       _showSuccess('Welcome back!');
@@ -246,7 +256,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Enter your credentials to access your account',
+                      'Enter Your credentials to access your account',
                       style: TextStyle(
                         fontSize: 14,
                         color: AppColors.textSecondary,
@@ -286,17 +296,16 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
 
                     const SizedBox(height: 10),
 
-                    // ── Forgot Password ───────────────────────────────
                     Align(
                       alignment: Alignment.centerRight,
                       child: GestureDetector(
                         onTap: _forgotPassword,
-                        child: Text(
+                        child: const Text(
                           'Forgot Password?',
                           style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -337,6 +346,38 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                                   letterSpacing: 0.3,
                                 ),
                               ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        children: [
+                          const Text(
+                            'New to PoolX? ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const VendorSignUpScreen(),
+                              ),
+                            ),
+                            child: const Text(
+                              'Sign Up as a PoolX Partner',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -416,15 +457,23 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
   }
 }
 
-Future<Widget> partnerHomeFor(String uid) async {
+Future<Widget?> partnerHomeFor(String uid) async {
   final vendorDoc =
       await FirebaseFirestore.instance.collection('vendors').doc(uid).get();
-  final profileStep = vendorDoc.data()?['profile_step'] as String? ?? '';
+  final data = vendorDoc.data() ?? {};
+  final profileStep = data['profile_step'] as String? ?? '';
+  final approval = (data['approval_status'] as String? ?? '').toLowerCase();
   if (profileStep == 'fleet_complete' || profileStep == 'profile_complete') {
-    return VendorDashboardScreen();
+    return const PartnerShell();
+  }
+  if (profileStep == 'submitted') {
+    return approval == 'approved' ? const PartnerShell() : null;
+  }
+  if (profileStep == 'documents_complete') {
+    return const VendorPaymentOptionScreen();
   }
   if (profileStep == 'business_info_complete') {
-    return const VendorVehicleFleetScreen();
+    return const VendorDocumentsScreen();
   }
   return const VendorBusinessInfoScreen();
 }

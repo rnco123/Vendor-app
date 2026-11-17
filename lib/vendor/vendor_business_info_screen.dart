@@ -1,466 +1,15 @@
-// // lib/screens/vendor_business_info_screen.dart
-// import 'dart:ui' as BorderType;
+import 'dart:io';
 
-// import 'package:poolx_partner/supabase_service.dart';
-// import 'package:flutter/material.dart';
-// import '../app_colors.dart';
-// import 'vendor_vehicle_fleet_screen.dart';
-
-// class VendorBusinessInfoScreen extends StatefulWidget {
-//   const VendorBusinessInfoScreen({super.key});
-
-//   @override
-//   State<VendorBusinessInfoScreen> createState() => _VendorBusinessInfoScreenState();
-// }
-
-// class _VendorBusinessInfoScreenState extends State<VendorBusinessInfoScreen> {
-//   final _formKey = GlobalKey<FormState>();
-//   final _businessNameController = TextEditingController();
-//   final _businessAddressController = TextEditingController();
-//   final _contactNumberController = TextEditingController();
-//   final _emailController = TextEditingController();
-//   final _taxIdController = TextEditingController();
-//   String? _selectedBusinessType;
-//   bool _businessTypeTouched = false;
-//   final _supabaseService = SupabaseService();
-
-//   final List<String> _businessTypes = [
-//     'Transportation Company',
-//     'Car Rental Service',
-//     'Tour Operator',
-//     'Private Charter',
-//     'Corporate Transport',
-//   ];
-
-//   @override
-//   void dispose() {
-//     _businessNameController.dispose();
-//     _businessAddressController.dispose();
-//     _contactNumberController.dispose();
-//     _emailController.dispose();
-//     _taxIdController.dispose();
-//     super.dispose();
-//   }
-
-//   void _showBusinessTypeBottomSheet() {
-//     showModalBottomSheet(
-//       context: context,
-//       backgroundColor: Colors.transparent,
-//       isScrollControlled: true,
-//       builder: (context) {
-//         return Container(
-//           decoration: const BoxDecoration(
-//             color: Colors.white,
-//             borderRadius: BorderRadius.only(
-//               topLeft: Radius.circular(24),
-//               topRight: Radius.circular(24),
-//             ),
-//           ),
-//           child: Column(
-//             mainAxisSize: MainAxisSize.min,
-//             children: [
-//               const SizedBox(height: 12),
-//               // Drag handle
-//               Container(
-//                 width: 40,
-//                 height: 4,
-//                 decoration: BoxDecoration(
-//                   color: Colors.grey.shade300,
-//                   borderRadius: BorderRadius.circular(2),
-//                 ),
-//               ),
-//               const SizedBox(height: 20),
-//               // Title
-//               const Padding(
-//                 padding: EdgeInsets.symmetric(horizontal: 24),
-//                 child: Align(
-//                   alignment: Alignment.centerLeft,
-//                   child: Text(
-//                     'Select Business Type',
-//                     style: TextStyle(
-//                       fontSize: 18,
-//                       fontWeight: FontWeight.bold,
-//                       color: AppColors.primary,
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//               const SizedBox(height: 8),
-//               const Divider(height: 1),
-//               // Options list
-//               ListView.separated(
-//                 shrinkWrap: true,
-//                 physics: const NeverScrollableScrollPhysics(),
-//                 itemCount: _businessTypes.length,
-//                 separatorBuilder: (_, __) => const Divider(
-//                   height: 1,
-//                   indent: 24,
-//                   endIndent: 24,
-//                 ),
-//                 itemBuilder: (context, index) {
-//                   final type = _businessTypes[index];
-//                   final isSelected = _selectedBusinessType == type;
-//                   return InkWell(
-//                     onTap: () {
-//                       setState(() {
-//                         _selectedBusinessType = type;
-//                         _businessTypeTouched = true;
-//                       });
-//                       Navigator.pop(context);
-//                     },
-//                     child: Padding(
-//                       padding: const EdgeInsets.symmetric(
-//                         horizontal: 24,
-//                         vertical: 16,
-//                       ),
-//                       child: Row(
-//                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                         children: [
-//                           Text(
-//                             type,
-//                             style: TextStyle(
-//                               fontSize: 15,
-//                               color: isSelected
-//                                   ? AppColors.primary
-//                                   : AppColors.textPrimary,
-//                               fontWeight: isSelected
-//                                   ? FontWeight.w600
-//                                   : FontWeight.normal,
-//                             ),
-//                           ),
-//                           if (isSelected)
-//                             const Icon(
-//                               Icons.check_circle,
-//                               color: AppColors.primary,
-//                               size: 20,
-//                             ),
-//                         ],
-//                       ),
-//                     ),
-//                   );
-//                 },
-//               ),
-//               const SizedBox(height: 24),
-//             ],
-//           ),
-//         );
-//       },
-//     );
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: const Color(0xFFF9FAFB),
-//       appBar: AppBar(
-//         titleSpacing: 0,
-//              backgroundColor: Color(0xFFF9FAFB),
-//         elevation: 0,
-//         shape: const Border(
-//           bottom: BorderSide(
-//             color: Color.fromARGB(255, 179, 178, 178),
-//             width: 1,
-//           ),
-//         ),
-//         leading: IconButton(
-//           icon: Container(
-//             padding: const EdgeInsets.all(6),
-//             decoration: BoxDecoration(
-//               color: Color.fromRGBO(230, 231, 242, 1),
-//               borderRadius: BorderRadius.circular(25),
-//             ),
-//             child: const Icon(
-//               Icons.arrow_back_ios_new,
-//               color: AppColors.textPrimary,
-//               size: 16,
-//             ),
-//           ),
-//           onPressed: () => Navigator.pop(context),
-//         ),
-       
-//         title: const Text(
-//           'Vendor Profile Setup',
-//           style: TextStyle(
-//             color: AppColors.textPrimary,
-//             fontSize: 18,
-//             fontWeight: FontWeight.w600,
-//           ),
-//         ),
-//       ),
-//       body: Form(
-//         key: _formKey,
-//         child: ListView(
-//           padding: const EdgeInsets.all(24),
-//           children: [
-//             const Text(
-//               'Business Information',
-//               style: TextStyle(
-//                 fontSize: 24,
-//                 fontWeight: FontWeight.bold,
-//                 color: AppColors.primary,
-//               ),
-//             ),
-//             const Divider(),
-//             const SizedBox(height: 32),
-//             _buildTextField(
-//               label: 'Business Name',
-//               hint: 'Enter your business name',
-//               controller: _businessNameController,
-//             ),
-//             const SizedBox(height: 20),
-//             _buildBusinessTypePicker(),
-//             const SizedBox(height: 20),
-//             _buildTextField(
-//               label: 'Business Address',
-//               hint: 'Enter your business address',
-//               controller: _businessAddressController,
-//             ),
-//             const SizedBox(height: 20),
-//             _buildTextField(
-//               label: 'Contact Number',
-//               hint: 'Enter contact number',
-//               controller: _contactNumberController,
-//               keyboardType: TextInputType.phone,
-//             ),
-//             const SizedBox(height: 20),
-//             _buildTextField(
-//               label: 'Email Address',
-//               hint: 'Enter email address',
-//               controller: _emailController,
-//               keyboardType: TextInputType.emailAddress,
-//             ),
-//             const SizedBox(height: 20),
-//             _buildTextField(
-//               label: 'Tax ID / Registration Number',
-//               hint: 'Enter tax ID / registration number',
-//               controller: _taxIdController,
-//             ),
-//             const SizedBox(height: 40),
-//             SizedBox(
-//               width: double.infinity,
-//               height: 56,
-//               child: ElevatedButton(
-//                 onPressed: () async {
-//                   setState(() {
-//                     _businessTypeTouched = true;
-//                   });
-//                   if (_formKey.currentState?.validate() ?? false) {
-//                     if (_selectedBusinessType == null) return;
-//                     try {
-//                       ScaffoldMessenger.of(context).showSnackBar(
-//                         const SnackBar(
-//                             content: Text('Saving business information...')),
-//                       );
-
-//                       // await _supabaseService.insertVendor(
-//                       //   businessName: _businessNameController.text.trim(),
-//                       //   businessType: _selectedBusinessType!,
-//                       //   businessAddress:
-//                       //       _businessAddressController.text.trim(),
-//                       //   contactNumber: _contactNumberController.text.trim(),
-//                       //   email: _emailController.text.trim(),
-//                       //   taxId: _taxIdController.text.trim(),
-//                       // );
-
-//                       if (mounted) {
-//                         Navigator.push(
-//                           context,
-//                           MaterialPageRoute(
-//                             builder: (context) =>
-//                                 const VendorVehicleFleetScreen(),
-//                           ),
-//                         );
-//                       }
-//                     } catch (e) {
-//                       if (mounted) {
-//                         ScaffoldMessenger.of(context).showSnackBar(
-//                           SnackBar(content: Text('Error: ${e.toString()}')),
-//                         );
-//                       }
-//                     }
-//                   }
-//                 },
-//                 style: ElevatedButton.styleFrom(
-//                   backgroundColor: AppColors.primary,
-//                   foregroundColor: Colors.white,
-//                    shadowColor: AppColors.primary.withValues(alpha: 0.3),
-//                   elevation: 0,
-//                   shape: RoundedRectangleBorder(
-//                     borderRadius: BorderRadius.circular(28),
-//                   ),
-//                 ),
-//                 child: const Text(
-//                   'Next',
-//                   style: TextStyle(
-//                     fontSize: 16,
-//                     fontWeight: FontWeight.w600,
-//                   ),
-//                 ),
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   Widget _buildBusinessTypePicker() {
-//     final hasError = _businessTypeTouched && _selectedBusinessType == null;
-//     return Column(
-//       crossAxisAlignment: CrossAxisAlignment.start,
-//       children: [
-//         const Text(
-//           'Business Type',
-//           style: TextStyle(
-//             fontSize: 14,
-//             fontWeight: FontWeight.w500,
-//             color: AppColors.textPrimary,
-//           ),
-//         ),
-//         const SizedBox(height: 8),
-//         GestureDetector(
-//           onTap: _showBusinessTypeBottomSheet,
-//           child: Container(
-//             padding:
-//                 const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-//             decoration: BoxDecoration(
-//               color: Colors.transparent,
-//               borderRadius: BorderRadius.circular(12),
-//               border: Border.all(
-//                 color: hasError ? AppColors.error : Colors.grey.shade200,
-//                 width: 1,
-//               ),
-//             ),
-//             child: Row(
-//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//               children: [
-//                 Text(
-//                   _selectedBusinessType ?? 'Select business type',
-//                   style: TextStyle(
-//                     fontSize: 15,
-//                     color: _selectedBusinessType != null
-//                         ? AppColors.textPrimary
-//                         : AppColors.textSecondary,
-//                   ),
-//                 ),
-//                 const Icon(
-//                   Icons.keyboard_arrow_down,
-//                   color: AppColors.textSecondary,
-//                   size: 22,
-//                 ),
-//               ],
-//             ),
-//           ),
-//         ),
-//         if (hasError) ...[
-//           const SizedBox(height: 6),
-//           const Text(
-//             'Please select a business type',
-//             style: TextStyle(
-//               fontSize: 12,
-//               color: AppColors.error,
-//             ),
-//           ),
-//         ],
-//       ],
-//     );
-//   }
-
-//   Widget _buildTextField({
-//     required String label,
-//     required String hint,
-//     required TextEditingController controller,
-//     TextInputType? keyboardType,
-//   }) {
-//     return Column(
-//       crossAxisAlignment: CrossAxisAlignment.start,
-//       children: [
-//         Text(
-//           label,
-//           style: const TextStyle(
-//             fontSize: 14,
-//             fontWeight: FontWeight.w500,
-//             color: AppColors.textPrimary,
-//           ),
-//         ),
-//         const SizedBox(height: 8),
-//         TextFormField(
-//             cursorColor: AppColors.primary,
-//           controller: controller,
-//           keyboardType: keyboardType,
-//           style: const TextStyle(
-//             fontSize: 15,
-//             color: AppColors.textPrimary,
-//           ),
-//           decoration: InputDecoration(
-//             hintText: hint,
-//             hintStyle: const TextStyle(
-//               fontSize: 15,
-//               color: AppColors.textSecondary,
-//             ),
-//             filled: true,
-//             fillColor: Colors.transparent,
-//             contentPadding: const EdgeInsets.symmetric(
-//               horizontal: 16,
-//               vertical: 16,
-//             ),
-//             border: OutlineInputBorder(
-//               borderRadius: BorderRadius.circular(12),
-//               borderSide: BorderSide(
-//                 color: Colors.grey.shade200,
-//                 width: 1,
-//               ),
-//             ),
-//             enabledBorder: OutlineInputBorder(
-//               borderRadius: BorderRadius.circular(12),
-//               borderSide: BorderSide(
-//                 color: Colors.grey.shade200,
-//                 width: 1,
-//               ),
-//             ),
-//             focusedBorder: OutlineInputBorder(
-//               borderRadius: BorderRadius.circular(12),
-//               borderSide: const BorderSide(
-//                 color: AppColors.primary,
-//                 width: 1.5,
-//               ),
-//             ),
-//             errorBorder: OutlineInputBorder(
-//               borderRadius: BorderRadius.circular(12),
-//               borderSide: const BorderSide(
-//                 color: AppColors.error,
-//                 width: 1,
-//               ),
-//             ),
-//             focusedErrorBorder: OutlineInputBorder(
-//               borderRadius: BorderRadius.circular(12),
-//               borderSide: const BorderSide(
-//                 color: AppColors.error,
-//                 width: 1.5,
-//               ),
-//             ),
-//           ),
-//           validator: (value) {
-//             if (value == null || value.trim().isEmpty) {
-//               return 'This field is required';
-//             }
-//             return null;
-//           },
-//         ),
-//       ],
-//     );
-//   }
-// }
-
-
-
-
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+
 import '../app_colors.dart';
-import 'vendor_vehicle_fleet_screen.dart';
 import '../shared/app_log.dart';
+import '../shared/network_check.dart';
+import '../shared/profile_image_service.dart';
+import 'vendor_documents_screen.dart';
+import 'vendor_ui.dart';
 
 class VendorBusinessInfoScreen extends StatefulWidget {
   const VendorBusinessInfoScreen({super.key});
@@ -470,207 +19,189 @@ class VendorBusinessInfoScreen extends StatefulWidget {
       _VendorBusinessInfoScreenState();
 }
 
-class _VendorBusinessInfoScreenState
-    extends State<VendorBusinessInfoScreen> {
+class _VendorBusinessInfoScreenState extends State<VendorBusinessInfoScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _businessNameController = TextEditingController();
-  final _businessAddressController = TextEditingController();
-  final _contactNumberController = TextEditingController();
-  final _emailController = TextEditingController();
+  final _companyController = TextEditingController();
+  final _typeController = TextEditingController();
   final _taxIdController = TextEditingController();
-  String? _selectedBusinessType;
-  bool _businessTypeTouched = false;
-  bool _isSaving = false;
+  final _addressController = TextEditingController();
+  final _contactController = TextEditingController();
+  final _emailController = TextEditingController();
 
-  final _firestore = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
-
-  final List<String> _businessTypes = [
-    'Transportation Company',
-    'Car Rental Service',
-    'Tour Operator',
-    'Private Charter',
-    'Corporate Transport',
-  ];
+  File? _logoFile;
+  String? _logoUrl;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _prefillFromFirestore();
+    _prefill();
   }
 
-  // ── Pre-fill if vendor doc already exists ─────────────────────────────
-  Future<void> _prefillFromFirestore() async {
+  @override
+  void dispose() {
+    _companyController.dispose();
+    _typeController.dispose();
+    _taxIdController.dispose();
+    _addressController.dispose();
+    _contactController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _prefill() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
     try {
-      final uid = _auth.currentUser?.uid;
-      if (uid == null) return;
-      final doc =
-          await _firestore.collection('vendors').doc(uid).get();
-      final data = doc.data();
-      if (data == null || !mounted) return;
+      final db = FirebaseFirestore.instance;
+      final vendor = (await db.collection('vendors').doc(uid).get()).data();
+      final user = (await db.collection('users').doc(uid).get()).data();
+      if (!mounted) return;
+      String pick(String key, [String? alt]) {
+        final v = vendor?[key] as String?;
+        if (v != null && v.trim().isNotEmpty) return v;
+        return (user?[alt ?? key] as String?) ?? '';
+      }
+
       setState(() {
-        if ((data['business_name'] as String? ?? '').isNotEmpty)
-          _businessNameController.text = data['business_name'];
-        if ((data['business_address'] as String? ?? '').isNotEmpty)
-          _businessAddressController.text = data['business_address'];
-        if ((data['contact_number'] as String? ?? '').isNotEmpty)
-          _contactNumberController.text = data['contact_number'];
-        if ((data['email'] as String? ?? '').isNotEmpty)
-          _emailController.text = data['email'];
-        if ((data['tax_id'] as String? ?? '').isNotEmpty)
-          _taxIdController.text = data['tax_id'];
-        if ((data['business_type'] as String? ?? '').isNotEmpty)
-          _selectedBusinessType = data['business_type'];
+        _companyController.text = pick('business_name');
+        _typeController.text = pick('business_type');
+        _taxIdController.text = pick('tax_id');
+        _addressController.text = pick('business_address');
+        _contactController.text = pick('contact_number', 'phone_number');
+        _emailController.text = pick('email');
+        _logoUrl = profileImageUrlFrom(vendor);
       });
-    } catch (e, st) { AppLog.caught('lib/vendor/vendor_business_info_screen.dart:525', e, st); }
-  }
-
-  // ── Save to Firestore vendors/{uid} ───────────────────────────────────
-  Future<void> _saveAndNext() async {
-    setState(() => _businessTypeTouched = true);
-
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_selectedBusinessType == null) return;
-
-    setState(() => _isSaving = true);
-
-    try {
-      final uid = _auth.currentUser?.uid;
-      if (uid == null) {
-        _showSnack('Not logged in');
-        setState(() => _isSaving = false);
-        return;
-      }
-
-      // upsert — create if not exists, update if exists
-      await _firestore.collection('vendors').doc(uid).set({
-        'firebase_uid': uid,
-        'business_name': _businessNameController.text.trim(),
-        'business_type': _selectedBusinessType,
-        'business_address': _businessAddressController.text.trim(),
-        'contact_number': _contactNumberController.text.trim(),
-        'email': _emailController.text.trim(),
-        'tax_id': _taxIdController.text.trim(),
-        'approval_status': 'pending',
-        'profile_step': 'business_info_complete',
-        'created_at': FieldValue.serverTimestamp(),
-        'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      if (mounted) {
-        setState(() => _isSaving = false);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const VendorVehicleFleetScreen(),
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() => _isSaving = false);
-      _showSnack('Error saving: $e');
+    } catch (e, st) {
+      AppLog.caught('lib/vendor/vendor_business_info_screen.dart:prefill', e, st);
     }
   }
 
-  void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  Future<void> _pickLogo() async {
+    final file = await pickProfileImageFile();
+    if (file == null || !mounted) return;
+    setState(() => _logoFile = file);
   }
 
-  void _showBusinessTypeBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+  Future<void> _next() async {
+    if (!_formKey.currentState!.validate()) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      showVendorSnack(context, 'Session expired. Please sign in again.');
+      return;
+    }
+    if (!await hasInternet()) {
+      if (mounted) showVendorSnack(context, offlineMessage);
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final data = <String, dynamic>{
+        'business_name': _companyController.text.trim(),
+        'business_type': _typeController.text.trim(),
+        'tax_id': _taxIdController.text.trim(),
+        'business_address': _addressController.text.trim(),
+        'contact_number': _contactController.text.trim(),
+        'email': _emailController.text.trim(),
+        'approval_status': 'pending',
+        'profile_step': 'business_info_complete',
+        'updated_at': FieldValue.serverTimestamp(),
+      };
+      if (_logoFile != null) {
+        try {
+          final url = await uploadProfileImage(
+            role: 'vendor',
+            uid: uid,
+            file: _logoFile!,
+          );
+          data['profile_image_url'] = url;
+          _logoUrl = url;
+        } catch (e, st) {
+          AppLog.caught('lib/vendor/vendor_business_info_screen.dart:logo', e, st);
+          if (mounted) {
+            showVendorSnack(context, profilePhotoUploadErrorMessage(e));
+          }
+          setState(() => _saving = false);
+          return;
+        }
+      }
+      await FirebaseFirestore.instance
+          .collection('vendors')
+          .doc(uid)
+          .set(data, SetOptions(merge: true));
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const VendorDocumentsScreen()),
+      );
+    } catch (e, st) {
+      AppLog.caught('lib/vendor/vendor_business_info_screen.dart:save', e, st);
+      if (mounted) {
+        showVendorSnack(context, 'Could not save your details. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  String? _emailValidator(String? v) {
+    final t = v?.trim() ?? '';
+    if (t.isEmpty) return 'This field is required';
+    if (!t.contains('@') || !t.contains('.')) return 'Enter a valid email';
+    return null;
+  }
+
+  Widget _logoPicker() {
+    ImageProvider? image;
+    if (_logoFile != null) {
+      image = FileImage(_logoFile!);
+    } else if (_logoUrl != null) {
+      image = NetworkImage(_logoUrl!);
+    }
+    return Center(
+      child: GestureDetector(
+        onTap: _saving ? null : _pickLogo,
+        child: SizedBox(
+          width: 96,
+          height: 96,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  color: AppColors.cardBackground,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.divider),
+                  image: image != null
+                      ? DecorationImage(image: image, fit: BoxFit.cover)
+                      : null,
+                ),
+                child: image == null
+                    ? const Icon(
+                        Icons.business_outlined,
+                        color: AppColors.primary,
+                        size: 36,
+                      )
+                    : null,
               ),
-            ),
-            const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Select Business Type',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+              Positioned(
+                right: 2,
+                bottom: 2,
+                child: Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
                     color: AppColors.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.background, width: 2),
                   ),
+                  child: const Icon(Icons.add, color: Colors.white, size: 16),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _businessTypes.length,
-              separatorBuilder: (_, __) => const Divider(
-                  height: 1, indent: 24, endIndent: 24),
-              itemBuilder: (context, index) {
-                final type = _businessTypes[index];
-                final isSelected = _selectedBusinessType == type;
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      _selectedBusinessType = type;
-                      _businessTypeTouched = true;
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 16),
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          type,
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.textPrimary,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          ),
-                        ),
-                        if (isSelected)
-                          const Icon(Icons.check_circle,
-                              color: AppColors.primary, size: 20),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -679,243 +210,84 @@ class _VendorBusinessInfoScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-      appBar: AppBar(
-        titleSpacing: 0,
-        backgroundColor: const Color(0xFFF9FAFB),
-        elevation: 0,
-        shape: const Border(
-          bottom: BorderSide(
-            color: Color.fromARGB(255, 179, 178, 178),
-            width: 1,
-          ),
-        ),
-        leading: IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color.fromRGBO(230, 231, 242, 1),
-              borderRadius: BorderRadius.circular(25),
-            ),
-            child: const Icon(Icons.arrow_back_ios_new,
-                color: AppColors.textPrimary, size: 16),
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Vendor Profile Setup',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            const Text(
-              'Business Information',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
-            ),
-            const Divider(),
-            const SizedBox(height: 32),
-            _buildTextField(
-              label: 'Business Name',
-              hint: 'Enter your business name',
-              controller: _businessNameController,
-            ),
-            const SizedBox(height: 20),
-            _buildBusinessTypePicker(),
-            const SizedBox(height: 20),
-            _buildTextField(
-              label: 'Business Address',
-              hint: 'Enter your business address',
-              controller: _businessAddressController,
-            ),
-            const SizedBox(height: 20),
-            _buildTextField(
-              label: 'Contact Number',
-              hint: 'Enter contact number',
-              controller: _contactNumberController,
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 20),
-            _buildTextField(
-              label: 'Email Address',
-              hint: 'Enter email address',
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 20),
-            _buildTextField(
-              label: 'Tax ID / Registration Number',
-              hint: 'Enter tax ID / registration number',
-              controller: _taxIdController,
-            ),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _saveAndNext,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  disabledBackgroundColor:
-                      AppColors.primary.withValues(alpha: 0.6),
-                  foregroundColor: Colors.white,
-                  shadowColor: AppColors.primary.withValues(alpha: 0.3),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28)),
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5))
-                    : const Text('Next',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBusinessTypePicker() {
-    final hasError =
-        _businessTypeTouched && _selectedBusinessType == null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Business Type',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary)),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _showBusinessTypeBottomSheet,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: hasError
-                    ? AppColors.error
-                    : Colors.grey.shade200,
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _selectedBusinessType ?? 'Select business type',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: _selectedBusinessType != null
-                        ? AppColors.textPrimary
-                        : AppColors.textSecondary,
+      backgroundColor: AppColors.background,
+      appBar: vendorSetupAppBar(context, 'Vendor Profile Setup'),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const VendorSetupHeading(
+                        title: 'Business Information',
+                        subtitle: 'Enter your business Information.',
+                      ),
+                      const SizedBox(height: 24),
+                      _logoPicker(),
+                      const SizedBox(height: 24),
+                      VendorLabeledField(
+                        label: 'Company Name',
+                        hint: 'Enter your business name',
+                        controller: _companyController,
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      const SizedBox(height: 16),
+                      VendorLabeledField(
+                        label: 'Business Type',
+                        hint: 'Enter business type',
+                        controller: _typeController,
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      const SizedBox(height: 16),
+                      VendorLabeledField(
+                        label: 'Registration / NTN no.',
+                        hint: 'Enter tax ID / registration number',
+                        controller: _taxIdController,
+                      ),
+                      const SizedBox(height: 16),
+                      VendorLabeledField(
+                        label: 'Business Address',
+                        hint: 'Enter your business address',
+                        controller: _addressController,
+                        keyboardType: TextInputType.streetAddress,
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      const SizedBox(height: 16),
+                      VendorLabeledField(
+                        label: 'Contact Number',
+                        hint: 'Enter contact number',
+                        controller: _contactController,
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 16),
+                      VendorLabeledField(
+                        label: 'Email Address',
+                        hint: 'Enter email address',
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: _emailValidator,
+                      ),
+                    ],
                   ),
                 ),
-                const Icon(Icons.keyboard_arrow_down,
-                    color: AppColors.textSecondary, size: 22),
-              ],
-            ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: VendorPrimaryButton(
+                  label: 'Next',
+                  loading: _saving,
+                  onPressed: _next,
+                ),
+              ),
+            ],
           ),
         ),
-        if (hasError) ...[
-          const SizedBox(height: 6),
-          const Text('Please select a business type',
-              style: TextStyle(
-                  fontSize: 12, color: AppColors.error)),
-        ],
-      ],
+      ),
     );
-  }
-
-  Widget _buildTextField({
-    required String label,
-    required String hint,
-    required TextEditingController controller,
-    TextInputType? keyboardType,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary)),
-        const SizedBox(height: 8),
-        TextFormField(
-          cursorColor: AppColors.primary,
-          controller: controller,
-          keyboardType: keyboardType,
-          style: const TextStyle(
-              fontSize: 15, color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(
-                fontSize: 15, color: AppColors.textSecondary),
-            filled: true,
-            fillColor: Colors.transparent,
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 16),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                    color: Colors.grey.shade200, width: 1)),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                    color: Colors.grey.shade200, width: 1)),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: AppColors.primary, width: 1.5)),
-            errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: AppColors.error, width: 1)),
-            focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: AppColors.error, width: 1.5)),
-          ),
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'This field is required';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  @override
-  void dispose() {
-    _businessNameController.dispose();
-    _businessAddressController.dispose();
-    _contactNumberController.dispose();
-    _emailController.dispose();
-    _taxIdController.dispose();
-    super.dispose();
   }
 }
