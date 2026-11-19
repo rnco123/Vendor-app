@@ -189,7 +189,7 @@ class _PartnerRequestDetailsScreenState extends State<PartnerRequestDetailsScree
     if (id.isEmpty) return null;
     if (id != _userId) {
       _userId = id;
-      _user = Px.db.collection('users').doc(id).get();
+      _user = Px.db.collection('passengers').doc(id).get();
     }
     return _user;
   }

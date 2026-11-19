@@ -239,8 +239,6 @@ class _PartnerSupportChatScreenState extends State<PartnerSupportChatScreen> {
       _chat,
       {
         'status': 'open',
-        'role': 'vendor',
-        if (widget.topic.isNotEmpty) 'topic': widget.topic,
         'last_message_preview': text.length > 200 ? text.substring(0, 200) : text,
         'last_message_at': FieldValue.serverTimestamp(),
       },

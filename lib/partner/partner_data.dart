@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
@@ -10,7 +11,7 @@ import '../vendor/vendor_passenger_requests_screen.dart' show VendorPassengerReq
 typedef PxDoc = QueryDocumentSnapshot<Map<String, dynamic>>;
 typedef PxMap = Map<String, dynamic>;
 
-const double kDefaultCommissionPercent = 15;
+const double kServerCommissionPercent = 15;
 
 class Px {
   Px._();
@@ -301,12 +302,18 @@ class Px {
 
   static String weekKey(DateTime start) => DateFormat('yyyyMMdd').format(start);
 
-  static num commissionPercent(PxMap vendor) {
-    final v = number(vendor['commission_percent']);
-    return v > 0 ? v : kDefaultCommissionPercent;
-  }
+  static num commissionPercent(PxMap vendor) => kServerCommissionPercent;
 
-  static String sosStatus(PxMap s) => norm(s['status']) == 'resolved' ? 'resolved' : 'active';
+  static String sosStatus(PxMap s) =>
+      const {'resolved', 'closed'}.contains(norm(s['status'])) ? 'resolved' : 'active';
+
+  static String callableError(Object e) {
+    if (e is FirebaseFunctionsException) {
+      final m = (e.message ?? '').trim();
+      return m.isEmpty ? 'Something went wrong (${e.code}).' : m;
+    }
+    return e.toString();
+  }
 
   static String methodLabel(String key) {
     switch (key) {
@@ -321,30 +328,6 @@ class Px {
     }
   }
 
-  static Future<void> notify({
-    required String userId,
-    required String role,
-    required String title,
-    required String body,
-    required String type,
-    String rideId = '',
-  }) async {
-    if (userId.isEmpty) return;
-    try {
-      await db.collection('notifications').add({
-        'user_id': userId,
-        'role': role,
-        'audience': role,
-        'title': title,
-        'body': body,
-        'type': type,
-        'ride_id': rideId,
-        'read': false,
-        'created_at': FieldValue.serverTimestamp(),
-      });
-    } catch (_) {}
-  }
-
   static Future<String?> approveDriver(String driverId) async {
     try {
       await db.collection('drivers').doc(driverId).update({
@@ -353,13 +336,6 @@ class Px {
         'rejection_reason': FieldValue.delete(),
         'vendor_rejection_reason': FieldValue.delete(),
       });
-      await notify(
-        userId: driverId,
-        role: 'driver',
-        title: 'You are approved',
-        body: 'Your vendor approved your driver profile.',
-        type: 'driver_approved',
-      );
       return null;
     } catch (e) {
       return 'Could not approve the driver. $e';
@@ -375,13 +351,6 @@ class Px {
         'vendor_rejection_reason': reason,
         'rejected_vendor_ids': FieldValue.arrayUnion([uid]),
       });
-      await notify(
-        userId: driverId,
-        role: 'driver',
-        title: 'Vendor request rejected',
-        body: reason.isEmpty ? 'Your vendor did not approve your profile.' : reason,
-        type: 'driver_rejected',
-      );
       return null;
     } catch (e) {
       return 'Could not reject the driver. $e';
@@ -395,57 +364,21 @@ class Px {
     String reason = '',
   }) async {
     try {
-      final batch = db.batch();
-      batch.update(db.collection('payments').doc(paymentId), {
-        'payment_status': status,
-        'vendor_review': {
-          'status': status,
-          'reason': reason,
-          'reviewed_at': FieldValue.serverTimestamp(),
-          'reviewed_by': uid,
-        },
-        if (status == 'approved') 'approved_at': FieldValue.serverTimestamp(),
+      await FirebaseFunctions.instance.httpsCallable('vendorReviewPayment').call({
+        'paymentId': paymentId,
+        'status': status,
+        'reason': reason,
       });
-      final rideId = text(payment['rideId']);
-      if (rideId.isNotEmpty) {
-        batch.set(
-          db.collection('active_rides').doc(rideId),
-          {
-            'payment_status': status,
-            if (status == 'approved')
-              'weekly_plan': {
-                'activated': true,
-                'activation_pending': false,
-                'activated_at': FieldValue.serverTimestamp(),
-              },
-          },
-          SetOptions(merge: true),
-        );
-      }
-      await batch.commit();
-      final title = status == 'approved'
-          ? 'Payment approved'
-          : status == 'rejected'
-              ? 'Payment rejected'
-              : 'Please upload a new payment screenshot';
-      await notify(
-        userId: text(payment['passengerId']),
-        role: 'passenger',
-        title: title,
-        body: reason.isEmpty ? title : reason,
-        type: 'payment_$status',
-        rideId: rideId,
-      );
       return null;
     } catch (e) {
-      return 'Could not update the payment. $e';
+      return callableError(e);
     }
   }
 
   static Future<String?> resolveSos(String id) async {
     try {
       await db.collection('sos_alerts').doc(id).update({
-        'status': 'resolved',
+        'status': 'closed',
         'resolved_at': FieldValue.serverTimestamp(),
         'resolved_by': uid,
       });
@@ -478,7 +411,7 @@ class PxStreams {
       Px.db.collection('sos_alerts').where('vendor_id', isEqualTo: Px.uid).limit(100).snapshots();
 
   static Stream<QuerySnapshot<PxMap>> payouts() =>
-      Px.db.collection('driver_payouts').where('vendor_id', isEqualTo: Px.uid).limit(300).snapshots();
+      Px.db.collection('vendor_payouts').where('vendor_id', isEqualTo: Px.uid).limit(300).snapshots();
 
   static Stream<DocumentSnapshot<PxMap>> vendor() => Px.db.collection('vendors').doc(Px.uid).snapshots();
 

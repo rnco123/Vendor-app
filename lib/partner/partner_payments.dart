@@ -1,6 +1,5 @@
-import 'dart:math' as math;
-
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -484,7 +483,7 @@ class _PartnerPaymentsPageState extends State<PartnerPaymentsPage> {
           for (final g in pending) ...[
             _payoutRow(
               name: g.driverName,
-              line1: 'Week ${Px.isoWeek(g.weekStart)} · ${Px.weekRange(g.weekStart)}',
+              line1: g.periodLabel,
               line2: '${g.passengers} passenger${g.passengers == 1 ? '' : 's'}${g.plan.isEmpty ? '' : ' · ${g.plan}'}',
               amount: g.net,
               button: SizedBox(
@@ -492,7 +491,9 @@ class _PartnerPaymentsPageState extends State<PartnerPaymentsPage> {
                 child: ElevatedButton(
                   onPressed: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => PartnerPayDriverScreen(group: g, commission: commission)),
+                    MaterialPageRoute(
+                      builder: (_) => PartnerPayDriverScreen(driverId: g.driverId, driverName: g.driverName),
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPxGreen,
@@ -513,8 +514,8 @@ class _PartnerPaymentsPageState extends State<PartnerPaymentsPage> {
           for (final p in paid) ...[
             _payoutRow(
               name: Px.text(p.data()['driver_name']).isEmpty ? 'Driver' : Px.text(p.data()['driver_name']),
-              line1: Px.text(p.data()['week_label']),
-              line2: '${Px.number(p.data()['passengers']).toInt()} passengers',
+              line1: pxPeriodLabel(Px.date(p.data()['week_start']), Px.date(p.data()['week_end'])),
+              line2: '${Px.number(p.data()['trips']).toInt()} passengers',
               amount: Px.number(p.data()['amount_paid']),
               button: SizedBox(
                 height: 28,
@@ -579,73 +580,83 @@ String _cap(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 class PxPayoutGroup {
   final String driverId;
   final String driverName;
-  final DateTime weekStart;
+  final DateTime? start;
+  final DateTime? end;
   final num gross;
   final num commission;
-  final num commissionPercent;
   final int passengers;
-  final int trips;
   final String plan;
-  final List<String> paymentIds;
 
   PxPayoutGroup({
     required this.driverId,
     required this.driverName,
-    required this.weekStart,
+    required this.start,
+    required this.end,
     required this.gross,
     required this.commission,
-    required this.commissionPercent,
     required this.passengers,
-    required this.trips,
     required this.plan,
-    required this.paymentIds,
   });
 
   num get net => gross - commission;
-  String get key => '${driverId}_${Px.weekKey(weekStart)}';
-  String get weekLabel => 'Week ${Px.isoWeek(weekStart)} · ${Px.weekRange(weekStart)}';
+  String get periodLabel => pxPeriodLabel(start, end);
+}
+
+String pxPeriodLabel(DateTime? a, DateTime? b) {
+  if (a == null) return '';
+  final s = Px.weekStart(a);
+  if (b == null || Px.weekStart(b) == s) return 'Week ${Px.isoWeek(a)} · ${Px.weekRange(s)}';
+  return '${DateFormat('d MMM').format(a)} – ${DateFormat('d MMM').format(b)}';
 }
 
 List<PxPayoutGroup> pxPendingPayouts(List<PxDoc> payments, List<PxDoc> payouts, num commissionPercent) {
-  final paidKeys = payouts.map((p) => p.id).toSet();
+  final paidIds = <String>{};
+  for (final p in payouts) {
+    final ids = p.data()['payment_ids'];
+    if (ids is List) paidIds.addAll(ids.map((e) => e.toString()));
+  }
   final groups = <String, List<PxMap>>{};
-  final ids = <String, List<String>>{};
   for (final p in payments) {
     final d = p.data();
     if (!Px.paymentApproved(d)) continue;
+    if (paidIds.contains(p.id) || Px.norm(d['driver_payout_status']) == 'paid') continue;
     final driverId = Px.text(d['driverId']);
-    final when = Px.paymentDate(d);
-    if (driverId.isEmpty || when == null) continue;
-    final key = '${driverId}_${Px.weekKey(Px.weekStart(when))}';
-    if (paidKeys.contains(key)) continue;
-    groups.putIfAbsent(key, () => []).add(d);
-    ids.putIfAbsent(key, () => []).add(p.id);
+    if (driverId.isEmpty) continue;
+    groups.putIfAbsent(driverId, () => []).add(d);
   }
   final out = <PxPayoutGroup>[];
-  groups.forEach((key, list) {
-    final first = list.first;
-    final when = Px.paymentDate(first)!;
-    final gross = list.fold<num>(0, (s, d) => s + Px.paymentAmount(d));
+  groups.forEach((driverId, list) {
+    num gross = 0;
+    num commission = 0;
+    DateTime? start;
+    DateTime? end;
     final plans = <String, int>{};
     for (final d in list) {
+      final amount = Px.number(d['amount']);
+      gross += amount;
+      commission += (amount * commissionPercent / 100).round();
+      final at = Px.date(d['transaction_date']);
+      if (at != null) {
+        if (start == null || at.isBefore(start)) start = at;
+        if (end == null || at.isAfter(end)) end = at;
+      }
       final pl = Px.planOfPayment(d);
       if (pl.isNotEmpty) plans[pl] = (plans[pl] ?? 0) + 1;
     }
     final plan = plans.isEmpty ? '' : (plans.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).first.key;
+    final named = list.firstWhere((d) => Px.text(d['driver_name']).isNotEmpty, orElse: () => const {});
     out.add(PxPayoutGroup(
-      driverId: Px.text(first['driverId']),
-      driverName: Px.text(first['driver_name']).isEmpty ? 'Driver' : Px.text(first['driver_name']),
-      weekStart: Px.weekStart(when),
+      driverId: driverId,
+      driverName: Px.text(named['driver_name']).isEmpty ? 'Driver' : Px.text(named['driver_name']),
+      start: start,
+      end: end,
       gross: gross,
-      commission: gross * commissionPercent / 100,
-      commissionPercent: commissionPercent,
+      commission: commission,
       passengers: list.map((d) => Px.text(d['passengerId'])).toSet().length,
-      trips: list.length,
       plan: plan,
-      paymentIds: ids[key] ?? const [],
     ));
   });
-  out.sort((a, b) => b.weekStart.compareTo(a.weekStart));
+  out.sort((a, b) => b.net.compareTo(a.net));
   return out;
 }
 
@@ -1037,35 +1048,67 @@ class _PartnerRequestReuploadScreenState extends State<PartnerRequestReuploadScr
 }
 
 class PartnerPayDriverScreen extends StatefulWidget {
-  final PxPayoutGroup group;
-  final num commission;
+  final String driverId;
+  final String driverName;
 
-  const PartnerPayDriverScreen({super.key, required this.group, required this.commission});
+  const PartnerPayDriverScreen({super.key, required this.driverId, required this.driverName});
 
   @override
   State<PartnerPayDriverScreen> createState() => _PartnerPayDriverScreenState();
 }
 
 class _PartnerPayDriverScreenState extends State<PartnerPayDriverScreen> {
-  late final Future<DocumentSnapshot<PxMap>> _driver =
-      Px.db.collection('drivers').doc(widget.group.driverId).get();
+  final _callable = FirebaseFunctions.instance.httpsCallable('vendorPayDriver');
+  PxMap? _preview;
+  String? _error;
+  String _method = '';
   bool _paying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _error = null;
+      _preview = null;
+    });
+    try {
+      final res = await _callable.call({'driverId': widget.driverId, 'preview': true});
+      final data = Px.map(res.data);
+      final methods = data['methods'] is List ? (data['methods'] as List).map(Px.map).toList() : <PxMap>[];
+      final active = Px.text(data['active_method']);
+      if (!mounted) return;
+      setState(() {
+        _preview = data;
+        _method = methods.any((m) => Px.text(m['method']) == active)
+            ? active
+            : (methods.isEmpty ? '' : Px.text(methods.first['method']));
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = Px.callableError(e));
+    }
+  }
+
+  List<PxMap> get _methods {
+    final m = _preview?['methods'];
+    return m is List ? m.map(Px.map).toList() : <PxMap>[];
+  }
+
+  PxMap get _chosen => _methods.firstWhere((m) => Px.text(m['method']) == _method, orElse: () => <String, dynamic>{});
+
+  String _via(PxMap m) {
+    final bank = Px.text(m['bank_name']);
+    return [Px.methodLabel(Px.text(m['method'])), if (bank.isNotEmpty) bank].join(' · ');
+  }
 
   String _pct(num v) => v % 1 == 0 ? v.toInt().toString() : v.toString();
 
-  String _mask(String n) {
-    final t = n.replaceAll(' ', '');
-    if (t.length <= 4) return t;
-    return '**** **** **** ${t.substring(t.length - 4)}';
-  }
-
-  Future<void> _confirm(PxMap driver) async {
-    final g = widget.group;
-    final pm = Px.map(driver['payment_methods']);
-    final method = Px.text(pm['active']);
-    final det = Px.map(pm[method]);
-    final bank = Px.text(det['bank_name']);
-    final via = [if (method.isNotEmpty) Px.methodLabel(method), if (bank.isNotEmpty) bank].join(' · ');
+  Future<void> _confirm() async {
+    final p = _preview!;
+    final pct = Px.number(p['commission_percent']);
     final ok = await showPxSheet<bool>(
       context,
       (ctx) => Padding(
@@ -1096,10 +1139,10 @@ class _PartnerPayDriverScreenState extends State<PartnerPayDriverScreen> {
             const Divider(color: kPxBorder, height: 22),
             PxInfoTable(
               [
-                MapEntry('Week', g.weekLabel),
-                MapEntry('Paid via', via),
-                MapEntry('Gross collected', Px.pkr(g.gross)),
-                MapEntry('Commission (${_pct(widget.commission)}%)', Px.pkr(g.commission)),
+                MapEntry('Period', pxPeriodLabel(Px.date(p['period_start']), Px.date(p['period_end']))),
+                MapEntry('Paid via', _via(_chosen)),
+                MapEntry('Gross collected', Px.pkr(Px.number(p['gross']))),
+                MapEntry('Commission (${_pct(pct)}%)', Px.pkr(Px.number(p['commission']))),
               ],
               valueColors: const {'Gross collected': kPxGreen},
             ),
@@ -1110,7 +1153,8 @@ class _PartnerPayDriverScreenState extends State<PartnerPayDriverScreen> {
               child: Row(
                 children: [
                   const Expanded(child: Text('Paying now', style: TextStyle(color: Color(0xFFD0D0D0), fontSize: 14))),
-                  Text(Px.pkr(g.net), style: const TextStyle(color: kPxBlue, fontSize: 17, fontWeight: FontWeight.w600)),
+                  Text(Px.pkr(Px.number(p['amount'])),
+                      style: const TextStyle(color: kPxBlue, fontSize: 17, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -1122,153 +1166,156 @@ class _PartnerPayDriverScreenState extends State<PartnerPayDriverScreen> {
     );
     if (ok != true || !mounted) return;
     setState(() => _paying = true);
-    final txn = 'TXN-${DateFormat('yyyyMMdd').format(DateTime.now())}-${1000 + math.Random().nextInt(9000)}';
-    final payout = <String, dynamic>{
-      'vendor_id': Px.uid,
-      'driver_id': g.driverId,
-      'driver_name': g.driverName,
-      'week_start': Timestamp.fromDate(g.weekStart),
-      'week_key': Px.weekKey(g.weekStart),
-      'week_label': g.weekLabel,
-      'gross': g.gross,
-      'commission_percent': widget.commission,
-      'commission': g.commission,
-      'amount_paid': g.net,
-      'trips': g.trips,
-      'passengers': g.passengers,
-      'method': method,
-      'method_label': via,
-      'bank_name': bank,
-      'account_title': Px.text(det['account_title']),
-      'account_number': Px.text(det['account_number']),
-      'payment_ids': g.paymentIds,
-      'status': 'paid',
-      'transaction_id': txn,
-      'paid_at': FieldValue.serverTimestamp(),
-    };
     try {
-      await Px.db.collection('driver_payouts').doc(g.key).set(payout);
-      await Px.notify(
-        userId: g.driverId,
-        role: 'driver',
-        title: 'Payout sent',
-        body: '${Px.pkr(g.net)} for ${g.weekLabel}',
-        type: 'driver_payout',
-      );
+      final res = await _callable.call({'driverId': widget.driverId, 'method': _method});
+      final data = Map<String, dynamic>.from(Px.map(res.data));
+      data['amount_paid'] = data['amount'];
+      data['week_start'] = data['period_start'];
+      data['week_end'] = data['period_end'];
       if (!mounted) return;
-      final shown = Map<String, dynamic>.from(payout)..['paid_at'] = Timestamp.now();
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => PartnerPayoutReceiptScreen(payout: shown)),
+        MaterialPageRoute(builder: (_) => PartnerPayoutReceiptScreen(payout: data)),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _paying = false);
-      pxToast(context, 'Could not save the payout. $e', ok: false);
+      pxToast(context, Px.callableError(e), ok: false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final g = widget.group;
-    return Scaffold(
-      backgroundColor: kPxBg,
-      appBar: pxBackAppBar(context, 'Pay Driver'),
-      body: FutureBuilder<DocumentSnapshot<PxMap>>(
-        future: _driver,
-        builder: (context, snap) {
-          if (!snap.hasData) return const PxLoading();
-          final d = snap.data!.data() ?? const <String, dynamic>{};
-          final pm = Px.map(d['payment_methods']);
-          final method = Px.text(pm['active']);
-          final det = Px.map(pm[method]);
-          return SafeArea(
-            child: Column(
+    final p = _preview;
+    Widget body;
+    if (_error != null) {
+      body = Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            PxEmpty(_error!, icon: Icons.error_outline),
+            PxButton.dark(label: 'Try again', onPressed: _load),
+          ],
+        ),
+      );
+    } else if (p == null) {
+      body = const PxLoading();
+    } else {
+      final name = Px.text(p['driver_name']).isEmpty ? widget.driverName : Px.text(p['driver_name']);
+      final pct = Px.number(p['commission_percent']);
+      final count = Px.number(p['payment_count']).toInt();
+      final chosen = _chosen;
+      final canPay = count > 0 && _method.isNotEmpty;
+      body = Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(12),
               children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(12),
+                PxCard(
+                  child: Column(
                     children: [
-                      PxCard(
-                        child: Column(
-                          children: [
-                            Row(
+                      Row(
+                        children: [
+                          PxAvatar(name: name, size: 38, photoStyle: true),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                PxAvatar(
-                                    name: g.driverName,
-                                    imageUrl: Px.text(d['profile_image_url']),
-                                    size: 38,
-                                    photoStyle: true),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(g.driverName,
-                                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-                                      Text('Week ${Px.isoWeek(g.weekStart)} • ${Px.weekRange(g.weekStart)} ${g.weekStart.year}',
-                                          style: const TextStyle(color: kPxMuted, fontSize: 9)),
-                                    ],
-                                  ),
-                                ),
+                                Text(name,
+                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                                Text(pxPeriodLabel(Px.date(p['period_start']), Px.date(p['period_end'])),
+                                    style: const TextStyle(color: kPxMuted, fontSize: 9)),
                               ],
                             ),
-                            const SizedBox(height: 10),
-                            _row('Passengers total', Px.pkr(g.gross), kPxGreen),
-                            _row('Your commission (${_pct(widget.commission)}%)', Px.pkr(g.commission), Colors.white),
-                            _row('Trips Completed', '${g.trips} trips', const Color(0xFFB5B5B5)),
-                            Padding(
-                              padding: const EdgeInsets.only(top: 10),
-                              child: Row(
-                                children: [
-                                  const Expanded(
-                                    child: Text('Driver Receives', style: TextStyle(color: Color(0xFFD0D0D0), fontSize: 14)),
-                                  ),
-                                  Text(Px.pkr(g.net),
-                                      style: const TextStyle(color: kPxBlue, fontSize: 17, fontWeight: FontWeight.w600)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      PxCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(height: 10),
+                      _row('Passengers total', Px.pkr(Px.number(p['gross'])), kPxGreen),
+                      _row('Your commission (${_pct(pct)}%)', Px.pkr(Px.number(p['commission'])), Colors.white),
+                      _row('Trips Completed', '${Px.number(p['trips']).toInt()} trips', const Color(0xFFB5B5B5)),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Row(
                           children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.account_balance_outlined, color: kPxGreen, size: 16),
-                                SizedBox(width: 8),
-                                Text('Driver Bank Details', style: TextStyle(color: Colors.white, fontSize: 12)),
-                              ],
+                            const Expanded(
+                              child: Text('Driver Receives', style: TextStyle(color: Color(0xFFD0D0D0), fontSize: 14)),
                             ),
-                            const SizedBox(height: 10),
-                            if (method.isEmpty)
-                              const Text('This driver has not added payment details yet.',
-                                  style: TextStyle(color: kPxAmber, fontSize: 11))
-                            else ...[
-                              _detail('Bank Name', Px.text(det['bank_name']).isEmpty ? Px.methodLabel(method) : Px.text(det['bank_name'])),
-                              _detail('Account Title', Px.text(det['account_title'])),
-                              _detail('Account Number', _mask(Px.text(det['account_number']))),
-                              if (Px.text(det['iban']).isNotEmpty) _detail('IBAN', Px.text(det['iban'])),
-                            ],
+                            Text(Px.pkr(Px.number(p['amount'])),
+                                style: const TextStyle(color: kPxBlue, fontSize: 17, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
-                  child: PxButton(label: 'Proceed to confirm', loading: _paying, onPressed: () => _confirm(d)),
+                const SizedBox(height: 12),
+                PxCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.account_balance_outlined, color: kPxGreen, size: 16),
+                          SizedBox(width: 8),
+                          Text('Driver Bank Details', style: TextStyle(color: Colors.white, fontSize: 12)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (_methods.isEmpty)
+                        const Text('This driver has not added payout details yet.',
+                            style: TextStyle(color: kPxAmber, fontSize: 11))
+                      else ...[
+                        if (_methods.length > 1)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Wrap(
+                              spacing: 8,
+                              children: [
+                                for (final m in _methods)
+                                  ChoiceChip(
+                                    label: Text(Px.methodLabel(Px.text(m['method']))),
+                                    selected: Px.text(m['method']) == _method,
+                                    onSelected: (_) => setState(() => _method = Px.text(m['method'])),
+                                    selectedColor: kPxGreen.withAlpha(60),
+                                    backgroundColor: kPxSurface2,
+                                    labelStyle: const TextStyle(color: Colors.white, fontSize: 11),
+                                    side: BorderSide.none,
+                                    showCheckmark: false,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        _detail('Bank Name', Px.text(chosen['bank_name']).isEmpty
+                            ? Px.methodLabel(Px.text(chosen['method']))
+                            : Px.text(chosen['bank_name'])),
+                        _detail('Account Title', Px.text(chosen['account_title'])),
+                        _detail('Account Number', '**** **** **** ${Px.text(chosen['account_last4'])}'),
+                      ],
+                    ],
+                  ),
                 ),
+                if (count == 0) ...[
+                  const SizedBox(height: 12),
+                  const Text('No approved passenger payments are waiting for payout.',
+                      style: TextStyle(color: kPxAmber, fontSize: 11)),
+                ],
               ],
             ),
-          );
-        },
-      ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
+            child: PxButton(label: 'Proceed to confirm', loading: _paying, onPressed: canPay ? _confirm : null),
+          ),
+        ],
+      );
+    }
+    return Scaffold(
+      backgroundColor: kPxBg,
+      appBar: pxBackAppBar(context, 'Pay Driver'),
+      body: SafeArea(child: body),
     );
   }
 
@@ -1307,19 +1354,22 @@ class PartnerPayoutReceiptScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = payout;
     final paidAt = Px.date(p['paid_at']) ?? DateTime.now();
-    final name = Px.text(p['driver_name']);
-    final via = Px.text(p['method_label']);
-    final week = Px.text(p['week_label']).split(' · ').first;
+    final name = Px.text(p['driver_name']).isEmpty ? 'Driver' : Px.text(p['driver_name']);
+    final bank = Px.text(p['bank_name']);
+    final via = [Px.methodLabel(Px.text(p['method'])), if (bank.isNotEmpty) bank].where((e) => e.isNotEmpty).join(' · ');
+    final period = pxPeriodLabel(Px.date(p['week_start']), Px.date(p['week_end']));
     final pct = Px.number(p['commission_percent']);
+    final pctText = pct % 1 == 0 ? pct.toInt().toString() : pct.toString();
+    final when = DateFormat('d MMM yyyy · h:mm a').format(paidAt);
     final receipt = [
       'PoolX payout receipt',
       'Driver: $name',
-      'Week: ${Px.text(p['week_label'])}',
+      if (period.isNotEmpty) 'Period: $period',
       'Gross collected: ${Px.pkr(Px.number(p['gross']))}',
-      'Commission (${pct % 1 == 0 ? pct.toInt() : pct}%): ${Px.pkr(Px.number(p['commission']))}',
+      'Commission ($pctText%): ${Px.pkr(Px.number(p['commission']))}',
       'Amount paid: ${Px.pkr(Px.number(p['amount_paid']))}',
       'Method: $via',
-      'Date: ${DateFormat('d MMM yyyy · h:mm a').format(paidAt)}',
+      'Date: $when',
       'Transaction ID: ${Px.text(p['transaction_id'])}',
     ].join('\n');
     return Scaffold(
@@ -1347,12 +1397,12 @@ class PartnerPayoutReceiptScreen extends StatelessWidget {
             PxInfoTable(
               [
                 MapEntry('Driver', name),
-                MapEntry('Week', week),
+                MapEntry('Period', period),
                 MapEntry('Gross collected', Px.pkr(Px.number(p['gross']))),
                 MapEntry('Commission deducted', Px.pkr(Px.number(p['commission']))),
                 MapEntry('Amount paid', Px.pkr(Px.number(p['amount_paid']))),
                 MapEntry('Method', via),
-                MapEntry('Date & time', DateFormat('d MMM yyyy · h:mm a').format(paidAt)),
+                MapEntry('Date & time', when),
                 const MapEntry('Status', 'Paid'),
               ],
               valueColors: const {'Gross collected': kPxGreen, 'Amount paid': kPxBlue, 'Status': kPxGreen},
